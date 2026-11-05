@@ -1,0 +1,56 @@
+ARG BUILD_FROM
+FROM ${BUILD_FROM}
+
+WORKDIR /usr/src
+ARG BUILD_ARCH
+ENV RTLAMR_VERSION=0.9.1
+
+RUN \
+    set -x \
+    && apt-get update \
+	&& apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-paho-mqtt \
+        python3-dateutil \
+                bash \
+        curl \
+        build-essential \
+        cmake \
+        git \
+                debhelper \
+                libusb-1.0-0-dev \
+                pkg-config \
+        \
+        && curl -J -L -o /tmp/rtlamr.tar.gz \
+    "https://github.com/bemasher/rtlamr/releases/download/v${RTLAMR_VERSION}/rtlamr_linux_${BUILD_ARCH}.tar.gz" \
+    && tar -xf /tmp/rtlamr.tar.gz -C /usr/bin \
+    && chmod a+x /usr/bin/rtlamr \
+    && rm /tmp/rtlamr.tar.gz \
+    && git clone https://github.com/rtlsdrblog/rtl-sdr-blog \
+    && cd rtl-sdr-blog \
+    && dpkg-buildpackage -b --no-sign \
+    && cd .. \
+    && dpkg -i librtlsdr0_*.deb \
+    && dpkg -i librtlsdr-dev_*.deb \
+        && dpkg -i rtl-sdr_*.deb \
+        && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    \
+    && echo "Add user for AMR2MQTT" \
+    && mkdir -p /data/amr2mqtt \
+    && useradd -u 12345 -U -d /data/amr2mqtt abc \
+        && apt-get purge -y --auto-remove \
+        build-essential \
+        git \
+        cmake \
+		debhelper \
+        pkg-config \
+    && apt-get clean
+
+
+
+# S6-Overlay
+WORKDIR /root
+ENTRYPOINT ["/init"]
+
+COPY rootfs /
